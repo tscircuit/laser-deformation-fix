@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightBurnProject AppVersion="2.1.03" FormatVersion="1" MirrorX="False" MirrorY="False">
+    <Shape Type="Path" CutIndex="0">
+        <XForm>1 0 0 1 50 40</XForm>
+        <VertList>V0 0V10 0c0x12c0y0V10 10c1x12c1y10V0 10</VertList>
+        <PrimList>L0 1B1 2L2 3L3 0</PrimList>
+    </Shape>
+</LightBurnProject>
