@@ -2,19 +2,18 @@ import { readFile } from "node:fs/promises"
 import { TopologyMismatchError, VerificationError } from "../errors.js"
 import { shapeToWorldGeometry } from "../geometry/shape-conversion.js"
 import type {
-  LayerWarpTransform,
+  GlobalWarpTransform,
   LightBurnDocument,
   Point,
   WorldContour,
 } from "../types.js"
 import { collectShapeRecords, GeometryResolver } from "../xml/geometry-resolver.js"
 import { parseLightBurn } from "../xml/parse-lightburn.js"
-import { parseLayerWarpTransform } from "../calibration/transform.js"
+import { parseGlobalWarpTransform } from "../calibration/transform.js"
 import { applyTransformToDocument } from "./apply.js"
 
 export interface VerifyOptions {
   tolerance?: number
-  cutIndexes?: readonly string[]
 }
 
 export interface VerifyResult {
@@ -24,8 +23,6 @@ export interface VerifyResult {
 }
 
 interface ComparablePath {
-  cutIndex: string
-  layerPathIndex: number
   contours: WorldContour[]
 }
 
@@ -37,7 +34,6 @@ interface Segment {
 function comparablePaths(
   document: LightBurnDocument,
   maxSegmentLength: number,
-  includedCutIndexes?: ReadonlySet<string>,
 ): Map<string, ComparablePath[]> {
   const shapes = collectShapeRecords(document.root)
   const resolver = new GeometryResolver(shapes)
@@ -45,7 +41,6 @@ function comparablePaths(
   for (const shape of shapes) {
     if (shape.shapeType !== "Path") continue
     const cutIndex = shape.element.attributes.CutIndex ?? ""
-    if (includedCutIndexes && !includedCutIndexes.has(cutIndex)) continue
     const geometry = shapeToWorldGeometry(
       shape,
       resolver,
@@ -57,7 +52,7 @@ function comparablePaths(
     )
     if (!geometry) continue
     const layer = result.get(cutIndex) ?? []
-    layer.push({ cutIndex, layerPathIndex: layer.length, contours: geometry.contours })
+    layer.push({ contours: geometry.contours })
     result.set(cutIndex, layer)
   }
   return result
@@ -149,11 +144,8 @@ export function comparePathGeometry(
     throw new VerificationError("--tolerance must be a positive finite number")
   }
   const sampleLength = Math.min(0.01, tolerance / 2)
-  const includedCutIndexes = options.cutIndexes
-    ? new Set(options.cutIndexes)
-    : undefined
-  const actualLayers = comparablePaths(actual, sampleLength, includedCutIndexes)
-  const referenceLayers = comparablePaths(reference, sampleLength, includedCutIndexes)
+  const actualLayers = comparablePaths(actual, sampleLength)
+  const referenceLayers = comparablePaths(reference, sampleLength)
   const cutIndexes = [...new Set([...actualLayers.keys(), ...referenceLayers.keys()])]
   let matchedPathCount = 0
   let maximum = 0
@@ -205,30 +197,15 @@ export function comparePathGeometry(
 }
 
 export function verifyTransformAgainstReference(
-  transform: LayerWarpTransform,
+  transform: GlobalWarpTransform,
   input: LightBurnDocument,
   reference: LightBurnDocument,
   options: VerifyOptions = {},
 ): VerifyResult {
   const generated = applyTransformToDocument(input, transform, {
     segmentLength: 0.05,
-    allowOutside: false,
   }).document
-  const nonlinearCutIndexes = new Set(
-    transform.rules.flatMap((rule) => rule.cutIndexes),
-  )
-  const nonlinearResult = comparePathGeometry(generated, reference, {
-    ...options,
-    cutIndexes: [...nonlinearCutIndexes],
-  })
-  const translationPathCount = collectShapeRecords(input.root).filter((shape) => (
-    shape.shapeType === "Path"
-    && !nonlinearCutIndexes.has(shape.element.attributes.CutIndex ?? "")
-  )).length
-  return {
-    ...nonlinearResult,
-    matchedPathCount: nonlinearResult.matchedPathCount + translationPathCount,
-  }
+  return comparePathGeometry(generated, reference, options)
 }
 
 export async function verifyCommand(
@@ -245,7 +222,7 @@ export async function verifyCommand(
       `Invalid transformation JSON: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
-  const transform = parseLayerWarpTransform(rawTransform)
+  const transform = parseGlobalWarpTransform(rawTransform)
   const [input, reference] = await Promise.all([
     readFile(inputPath, "utf8").then((xml) => parseLightBurn(xml, inputPath)),
     readFile(referencePath, "utf8").then((xml) => parseLightBurn(xml, referencePath)),

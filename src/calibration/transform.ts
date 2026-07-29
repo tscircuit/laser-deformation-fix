@@ -1,11 +1,9 @@
 import { z } from "zod"
 import { TransformValidationError } from "../errors.js"
 import type {
-  BicubicTransformRule,
   CoefficientMatrix4,
-  LayerWarpTransform,
+  GlobalWarpTransform,
   Point,
-  TranslationTransformRule,
 } from "../types.js"
 
 const finiteNumber = z.number().refine(Number.isFinite, "must be finite")
@@ -13,23 +11,68 @@ const coefficientRow = z.tuple([finiteNumber, finiteNumber, finiteNumber, finite
 const coefficientMatrix = z.tuple([
   coefficientRow, coefficientRow, coefficientRow, coefficientRow,
 ])
-const translationRuleSchema = z.object({
-  kind: z.literal("translation"),
-  offsetMm: z.tuple([finiteNumber, finiteNumber]),
+const pointSchema = z.object({ x: finiteNumber, y: finiteNumber }).strict()
+const vertexSchema = z.object({
+  x: finiteNumber,
+  y: finiteNumber,
+  c0: pointSchema.optional(),
+  c1: pointSchema.optional(),
 }).strict()
-const bicubicRuleSchema = z.object({
-  kind: z.literal("bicubic"),
-  cutIndexes: z.array(z.string()).min(1),
-  xCoefficients: coefficientMatrix,
-  yCoefficients: coefficientMatrix,
+const primitiveSchema = z.object({
+  kind: z.enum(["line", "cubic-bezier"]),
+  startIndex: z.number().int().nonnegative(),
+  endIndex: z.number().int().nonnegative(),
 }).strict()
-
-const layerWarpSchema = z.object({
-  format: z.literal("lightburn-layer-warp-v2"),
+const resolvedPathSchema = z.object({
+  vertices: z.array(vertexSchema).min(2),
+  primitives: z.array(primitiveSchema).min(1),
+  closed: z.boolean(),
+}).strict().superRefine((path, context) => {
+  path.primitives.forEach((primitive, primitiveIndex) => {
+    if (
+      primitive.startIndex >= path.vertices.length
+      || primitive.endIndex >= path.vertices.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "primitive references a missing vertex",
+        path: ["primitives", primitiveIndex],
+      })
+    }
+    if (
+      primitive.kind === "cubic-bezier"
+      && (
+        !path.vertices[primitive.startIndex]?.c0
+        || !path.vertices[primitive.endIndex]?.c1
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "cubic-bezier primitive is missing c0/c1 controls",
+        path: ["primitives", primitiveIndex],
+      })
+    }
+  })
+})
+const toolingPathSchema = z.object({
+  sourceNormalized: resolvedPathSchema,
+  targetWorld: resolvedPathSchema,
+}).strict()
+const globalWarpSchema = z.object({
+  format: z.literal("lightburn-global-warp-v2"),
   sourceBoundsMm: z.tuple([finiteNumber, finiteNumber, finiteNumber, finiteNumber]),
   coordinateFrame: z.object({ mirrorX: z.boolean(), mirrorY: z.boolean() }).strict(),
-  defaultRule: translationRuleSchema,
-  rules: z.array(bicubicRuleSchema),
+  tooling: z.object({
+    cutIndex: z.string().min(1),
+    paths: z.tuple([
+      toolingPathSchema,
+      toolingPathSchema,
+      toolingPathSchema,
+      toolingPathSchema,
+    ]),
+  }).strict(),
+  xCoefficients: coefficientMatrix,
+  yCoefficients: coefficientMatrix,
   fit: z.object({
     matchedPathCount: z.number().int().nonnegative(),
     matchedPointCount: z.number().int().nonnegative(),
@@ -53,19 +96,6 @@ const layerWarpSchema = z.object({
       path: ["sourceBoundsMm"],
     })
   }
-  const seen = new Set<string>()
-  value.rules.forEach((rule, ruleIndex) => {
-    rule.cutIndexes.forEach((cutIndex, cutIndexPosition) => {
-      if (seen.has(cutIndex)) {
-        context.addIssue({
-          code: "custom",
-          message: `CutIndex ${cutIndex} occurs in more than one ordered rule`,
-          path: ["rules", ruleIndex, "cutIndexes", cutIndexPosition],
-        })
-      }
-      seen.add(cutIndex)
-    })
-  })
 })
 
 export function validateBounds(bounds: [number, number, number, number]): void {
@@ -80,14 +110,25 @@ export function validateBounds(bounds: [number, number, number, number]): void {
   }
 }
 
-export function parseLayerWarpTransform(value: unknown): LayerWarpTransform {
-  const parsed = layerWarpSchema.safeParse(value)
+export function parseGlobalWarpTransform(value: unknown): GlobalWarpTransform {
+  if (
+    typeof value === "object"
+    && value !== null
+    && "format" in value
+    && value.format === "lightburn-global-warp-v1"
+  ) {
+    throw new TransformValidationError(
+      "Legacy lightburn-global-warp-v1 transforms do not contain tooling anchors; "
+      + "relearn the transform with the current version",
+    )
+  }
+  const parsed = globalWarpSchema.safeParse(value)
   if (!parsed.success) {
     throw new TransformValidationError(
       `Invalid transformation JSON: ${z.prettifyError(parsed.error)}`,
     )
   }
-  return parsed.data
+  return parsed.data as GlobalWarpTransform
 }
 
 export function isOutsideBounds(
@@ -140,37 +181,20 @@ function evaluateCoefficients(
   return value
 }
 
-export function findRule(
-  transform: LayerWarpTransform,
-  cutIndex: string,
-): BicubicTransformRule | TranslationTransformRule {
-  return transform.rules.find((rule) => rule.cutIndexes.includes(cutIndex))
-    ?? transform.defaultRule
-}
-
 export function warpPoint(
   point: Point,
-  transform: LayerWarpTransform,
-  cutIndex = "",
-): { point: Point; outside: boolean; rule: BicubicTransformRule | TranslationTransformRule } {
-  const rule = findRule(transform, cutIndex)
-  if (rule.kind === "translation") {
-    return {
-      point: { x: point.x + rule.offsetMm[0], y: point.y + rule.offsetMm[1] },
-      outside: false,
-      rule,
-    }
-  }
+  transform: GlobalWarpTransform,
+  sourceBounds: [number, number, number, number] = transform.sourceBoundsMm,
+): { point: Point; outside: boolean } {
   return {
     point: {
-      x: evaluateCoefficients(point, transform.sourceBoundsMm, rule.xCoefficients),
-      y: evaluateCoefficients(point, transform.sourceBoundsMm, rule.yCoefficients),
+      x: evaluateCoefficients(point, sourceBounds, transform.xCoefficients),
+      y: evaluateCoefficients(point, sourceBounds, transform.yCoefficients),
     },
-    outside: isOutsideBounds(point, transform.sourceBoundsMm),
-    rule,
+    outside: isOutsideBounds(point, sourceBounds),
   }
 }
 
-export function stringifyLayerWarpTransform(transform: LayerWarpTransform): string {
+export function stringifyGlobalWarpTransform(transform: GlobalWarpTransform): string {
   return `${JSON.stringify(transform, null, 2)}\n`
 }

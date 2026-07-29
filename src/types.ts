@@ -91,30 +91,27 @@ export type CoefficientMatrix4 = [
   [number, number, number, number],
 ]
 
-export interface TranslationTransformRule {
-  kind: "translation"
-  offsetMm: [number, number]
-}
-
-export interface BicubicTransformRule {
-  kind: "bicubic"
-  cutIndexes: string[]
-  /** Coefficients for absolute output X, indexed as [xPower][yPower]. */
-  xCoefficients: CoefficientMatrix4
-  /** Coefficients for absolute output Y, indexed as [xPower][yPower]. */
-  yCoefficients: CoefficientMatrix4
-}
-
-export interface LayerWarpTransform {
-  format: "lightburn-layer-warp-v2"
+export interface GlobalWarpTransform {
+  format: "lightburn-global-warp-v2"
+  /** Tooling bounds used to normalize the calibration source geometry. */
   sourceBoundsMm: [number, number, number, number]
   coordinateFrame: {
     mirrorX: boolean
     mirrorY: boolean
   }
-  defaultRule: TranslationTransformRule
-  /** Rules are evaluated in array order. */
-  rules: BicubicTransformRule[]
+  tooling: {
+    cutIndex: string
+    paths: [
+      ToolingPathTransform,
+      ToolingPathTransform,
+      ToolingPathTransform,
+      ToolingPathTransform,
+    ]
+  }
+  /** Absolute output X coefficients, indexed as [xPower][yPower]. */
+  xCoefficients: CoefficientMatrix4
+  /** Absolute output Y coefficients, indexed as [xPower][yPower]. */
+  yCoefficients: CoefficientMatrix4
   fit: {
     matchedPathCount: number
     matchedPointCount: number
@@ -144,4 +141,11 @@ export interface WorldContour {
 export interface ShapeGeometry {
   shape: ShapeRecord
   contours: WorldContour[]
+}
+
+export interface ToolingPathTransform {
+  /** Calibration-source path in coordinates normalized to the tooling bounds. */
+  sourceNormalized: ResolvedPath
+  /** Corrected calibration path in absolute LightBurn world coordinates. */
+  targetWorld: ResolvedPath
 }

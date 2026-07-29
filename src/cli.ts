@@ -42,7 +42,7 @@ program.command("inspect")
   })
 
 program.command("learn")
-  .description("Learn a layer-aware bicubic transform from an original/corrected pair")
+  .description("Learn one global bicubic transform from an original/corrected pair")
   .argument("<original>", "original .lbrn2 or .lbrn project")
   .argument("<corrected>", "corrected .lbrn2 or .lbrn project")
   .argument("<transform>", "output transform JSON")
@@ -50,8 +50,6 @@ program.command("learn")
     const result = await learnCommand(original, corrected, transform)
     console.log(`Matched paths: ${result.matchedShapeCount}`)
     console.log(`Fitted correspondences: ${result.transform.fit.matchedPointCount}`)
-    console.log(`Default translation (mm): ${result.defaultTranslation.x} ${result.defaultTranslation.y}`)
-    console.log(`Bicubic CutIndexes: ${result.nonlinearCutIndexes.join(", ")}`)
     console.log(`Matrix rank: ${result.transform.fit.matrixRank}`)
     console.log(`RMS error (mm): ${result.transform.fit.rmsErrorMm}`)
     console.log(`Mean error (mm): ${result.transform.fit.meanErrorMm}`)
@@ -63,21 +61,20 @@ program.command("learn")
   })
 
 program.command("apply")
-  .description("Apply a learned lens correction to a LightBurn project")
+  .description("Apply a tooling-anchored lens correction to a LightBurn project")
   .argument("<transform>")
   .argument("<input>")
   .argument("<output>")
   .option("--segment-length <mm>", "maximum generated line length", positiveNumber, 0.05)
-  .option("--allow-outside", "allow nonlinear extrapolation outside calibration bounds")
   .action(async (
     transform: string,
     input: string,
     output: string,
-    options: { segmentLength: number; allowOutside?: boolean },
+    options: { segmentLength: number },
   ) => {
     const result = await applyCommand(transform, input, output, options)
     console.log(`Corrected shapes: ${result.correctedShapeCount}`)
-    console.log(`Points outside calibration bounds: ${result.outsidePointCount}`)
+    console.log(`Points outside tooling bounds: ${result.outsidePointCount}`)
     console.log(`Wrote project: ${output}`)
     printWarnings(result.warnings)
   })
