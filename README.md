@@ -1,9 +1,9 @@
-# LightBurn Layer Warp
+# LightBurn Tooling-Anchored Warp
 
-`lightburn-lens-warp` learns and reapplies the layer-aware deformation stored in a
-pair of LightBurn projects. It is designed for projects where some cut layers
-receive LightBurn's nonlinear deformation and the remaining layers receive only
-a placement translation.
+`lightburn-lens-warp` learns and reapplies one global nonlinear deformation
+stored in a pair of LightBurn projects. The four paths on the project's Tool
+layer define the normalization frame, so projects with different board extents
+retain the same corrected tooling coordinates.
 
 The learned direction is:
 
@@ -34,9 +34,9 @@ bun run build
 
 ```bash
 bun run src/cli.ts learn \
-  samples/led_test_V3.lbrn2 \
-  samples/deformation_corrected_led_test_V3.lbrn2 \
-  generated/led_test_V3_transform.json
+  samples/alignment_test_circuit.lbrn2 \
+  samples/alignment_test_circuit_corrected.lbrn2 \
+  generated/alignment_transform.json
 ```
 
 Paths are paired by `CutIndex` and layer-local order. When paired paths have
@@ -44,83 +44,58 @@ compatible raw vertex counts and open/closed topology, their vertices are used
 directly as fitting correspondences. Incompatible paths are excluded from the
 direct fit but remain part of final contour verification.
 
-Learning automatically separates layers into two classes:
-
-- Layers whose target vertices contain no spatially varying deformation use the
-  default translation rule.
-- All other layers share one absolute-output tensor bicubic mapping.
-
-The default translation is inferred only from the moved layers. For each
-bicubic CutIndex, the learner compares the source and target layer extents, then
-uses the median center shift across those layers. Vertex density, the bicubic
-center distortion, and every unmoved layer are excluded from this placement
-estimate.
-
 The bicubic uses normalized source X/Y and two 4 by 4 coefficient matrices for
 absolute output X and Y. It is solved by SVD and rejected if the design matrix
 does not have rank 16 or the direct vertex residual exceeds `0.0001 mm`.
 
-The `lightburn-layer-warp-v2` JSON records inferred source bounds, mirror flags,
-the default translation, ordered `CutIndex` rules, coefficients, direct-fit
-statistics, and full-contour verification statistics. Existing transform files
-are not overwritten.
-
-For the supplied V3 pair, the learner identifies CutIndexes `6`, `16`, and `30`
-as bicubic, derives approximately `(83.8897, 60.3908) mm` for every other layer,
-and fits 1,462 direct vertices.
+The `lightburn-global-warp-v2` JSON records the source Tool bounds, normalized
+source Tool templates, exact corrected Tool geometry, mirror flags, bicubic
+coefficients, direct-fit statistics, and full-contour verification statistics.
+Learning requires exactly one Tool cut setting containing four paths. Existing
+transform files are not overwritten, and legacy v1 transforms must be relearned.
 
 ## Apply
 
 ```bash
 bun run src/cli.ts apply \
-  generated/led_test_V3_transform.json \
-  samples/led_test_V3.lbrn2 \
-  generated/led_test_V3_generated_corrected.lbrn2
+  generated/alignment_transform.json \
+  samples/rp2040.lbrn2 \
+  generated/rp2040_transformed.lbrn2
 ```
 
 Options:
 
 ```text
 --segment-length 0.05
---allow-outside
 ```
 
-Translation-only layers retain their original object representation. Their
-LightBurn transforms are translated in world coordinates, including for text,
-images, and unknown objects.
+The input Tool paths are matched geometrically, independent of document order.
+Their corrected geometry is copied exactly from the calibration transform.
+Missing, ambiguous, incomplete, or mismatched Tool geometry is an error.
 
-Objects on bicubic layers are flattened in world coordinates and emitted as
-explicit line-only paths. Paths, rectangles, ellipses, and polygons are
-supported. An unsupported object assigned to a bicubic layer is an explicit
-error; convert it to paths in LightBurn first.
-
-The default maximum generated segment length is `0.05 mm`. Geometry outside the
-inferred calibration bounds is an error unless `--allow-outside` is supplied.
-With the override, the bicubic polynomial is extrapolated.
+All other supported objects are normalized against the input Tool bounds,
+warped, and emitted as explicit line-only paths. The default maximum generated
+segment length is `0.05 mm`. Geometry outside the Tool rectangle is
+extrapolated and reported in the command result.
 
 Nested transforms and shared `VertID`/`PrimID` geometry are resolved before
-nonlinear correction. Metadata, cut settings, grouping, unsupported objects on
-translation layers, and object ordering are preserved where possible. Stale
-thumbnails are removed.
+nonlinear correction. Metadata, cut settings, grouping, and object ordering are
+preserved where possible. Unsupported objects are an explicit error; convert
+them to paths in LightBurn first. Stale thumbnails are removed.
 
 ## Verify
 
 ```bash
 bun run src/cli.ts verify \
-  generated/led_test_V3_transform.json \
-  samples/led_test_V3.lbrn2 \
-  samples/deformation_corrected_led_test_V3.lbrn2 \
+  generated/alignment_transform.json \
+  samples/alignment_test_circuit.lbrn2 \
+  samples/alignment_test_circuit_corrected.lbrn2 \
   --tolerance 0.01
 ```
 
-Verification applies the transform in memory. Bicubic layers are paired with
-the corrected reference by `CutIndex` and layer-local order and must remain
-within the symmetric Hausdorff tolerance. Translation-only layers are validated
-against the transform's derived placement instead of the corrected reference,
-because those layers may not have been moved consistently in the calibration
-file.
-
-The supplied V3 files verify all 90 paths at approximately `0.00535 mm`.
+Verification applies the transform in memory, pairs paths by `CutIndex` and
+layer-local order, and requires every contour to remain within the symmetric
+Hausdorff tolerance.
 
 ## Inspect
 
@@ -158,5 +133,5 @@ bun run build
 ```
 
 The regression suite includes parser and geometry fixtures plus direct fitting,
-automatic classification, application, and full contour verification against
-the supplied V3 projects.
+tooling-template validation, exact RP2040 tooling placement, application, and
+full contour verification.
