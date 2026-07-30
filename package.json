@@ -8,6 +8,7 @@
     "lightburn-lens-warp": "./dist/cli.js"
   },
   "scripts": {
+    "start": "bun run src/server.ts",
     "inspect": "bun run src/cli.ts inspect",
     "lightburn-lens-warp": "bun run src/cli.ts",
     "test": "bun test",

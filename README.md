@@ -30,6 +30,20 @@ bun run build
 ./dist/cli.js --help
 ```
 
+## Local UI
+
+Start the browser interface with:
+
+```bash
+bun run start
+```
+
+Open `http://127.0.0.1:3000`. The first step learns and downloads a transform
+from an original/corrected calibration pair. The second step applies that
+generated transform—or an uploaded v2 transform JSON—to a LightBurn project
+and downloads the corrected project. Uploaded files remain local and temporary
+working files are removed after each operation.
+
 ## Learn
 
 ```bash
