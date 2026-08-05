@@ -8,25 +8,39 @@
     "lightburn-lens-warp": "./dist/cli.js"
   },
   "scripts": {
-    "start": "bun run src/server.ts",
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "start:local": "bun run src/server.ts",
     "inspect": "bun run src/cli.ts inspect",
     "lightburn-lens-warp": "bun run src/cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/cli.ts --target=node --outdir=dist",
+    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
+    "build:cli": "bun build src/cli.ts --target=node --outdir=cli-dist",
     "lint": "eslint src tests"
   },
   "dependencies": {
     "commander": "^14.0.2",
     "fast-xml-parser": "^5.3.2",
     "ml-matrix": "^6.12.1",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
     "@types/bun": "^1.3.5",
     "@types/node": "^24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
     "eslint": "^9.39.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.51.0"
+    "typescript-eslint": "^8.51.0",
+    "vinext": "0.0.50",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
   }
 }

@@ -1,0 +1,43 @@
+@import "../ui/styles.css";
+
+.hosted-badge {
+  padding: 7px 10px;
+  border: 1px solid #31514e;
+  border-radius: 99px;
+  color: #9fc8c3;
+  font-size: 0.66rem;
+}
+
+.footer-note {
+  max-width: 760px;
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    width: min(100% - 24px, 1180px);
+  }
+
+  .hero-copy,
+  .workflow {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy {
+    margin-top: 50px;
+  }
+
+  .step-card {
+    padding: 24px 18px;
+  }
+
+  .file-field {
+    grid-template-columns: 1fr;
+  }
+
+  .file-choice {
+    grid-column: 1;
+    grid-row: auto;
+    max-width: 100%;
+    text-align: left;
+  }
+}
