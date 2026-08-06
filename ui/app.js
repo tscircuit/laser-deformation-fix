@@ -146,8 +146,8 @@ applyForm.addEventListener("submit", async (event) => {
     setStatus(
       applyStatus,
       outside > 0
-        ? `${outside.toLocaleString()} generated points were extrapolated beyond the tooling frame.`
-        : "All generated points were inside the tooling frame.",
+        ? `${outside.toLocaleString()} generated points were extrapolated beyond the transformation frame.`
+        : "All generated points were inside the transformation frame.",
     )
   } catch (error) {
     setStatus(applyStatus, error.message, true)

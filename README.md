@@ -84,14 +84,17 @@ Options:
 --segment-length 0.05
 ```
 
-The input Tool paths are matched geometrically, independent of document order.
-Their corrected geometry is copied exactly from the calibration transform.
-Missing, ambiguous, incomplete, or mismatched Tool geometry is an error.
+When present, the input Tool paths are matched geometrically, independent of
+document order. Their corrected geometry is copied exactly from the calibration
+transform. If the input has no Tool layer, application uses the transform's
+saved calibration bounds and does not add Tool geometry. Ambiguous, incomplete,
+or mismatched Tool geometry is an error.
 
-All other supported objects are normalized against the input Tool bounds,
-warped, and emitted as explicit line-only paths. The default maximum generated
-segment length is `0.05 mm`. Geometry outside the Tool rectangle is
-extrapolated and reported in the command result.
+All other supported objects are normalized against the input Tool bounds, or
+against the saved calibration bounds when that layer is absent, then warped and
+emitted as explicit line-only paths. The default maximum generated segment
+length is `0.05 mm`. Geometry outside the active bounds is extrapolated and
+reported in the command result.
 
 Nested transforms and shared `VertID`/`PrimID` geometry are resolved before
 nonlinear correction. Metadata, cut settings, grouping, and object ordering are

@@ -148,8 +148,8 @@ export default function Home() {
       const outside = Number(response.headers.get("X-Outside-Points") ?? 0)
       setOutput({ url, name, shapes })
       setApplyStatus(outside > 0
-        ? `${outside.toLocaleString()} generated points were extrapolated beyond the tooling frame.`
-        : "All generated points were inside the tooling frame.")
+        ? `${outside.toLocaleString()} generated points were extrapolated beyond the transformation frame.`
+        : "All generated points were inside the transformation frame.")
     } catch (error) {
       setApplyStatus(error instanceof Error ? error.message : String(error))
     } finally {
