@@ -74,7 +74,7 @@ program.command("apply")
   ) => {
     const result = await applyCommand(transform, input, output, options)
     console.log(`Corrected shapes: ${result.correctedShapeCount}`)
-    console.log(`Points outside tooling bounds: ${result.outsidePointCount}`)
+    console.log(`Points outside transformation bounds: ${result.outsidePointCount}`)
     console.log(`Wrote project: ${output}`)
     printWarnings(result.warnings)
   })

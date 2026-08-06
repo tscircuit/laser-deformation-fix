@@ -66,8 +66,20 @@ export function extractToolingLayer(
   document: LightBurnDocument,
   kind: ToolingErrorKind,
 ): ToolingLayer {
+  const tooling = extractOptionalToolingLayer(document, kind)
+  if (!tooling) {
+    throw toolingError(kind, "Expected exactly one Tool CutSetting, found 0")
+  }
+  return tooling
+}
+
+export function extractOptionalToolingLayer(
+  document: LightBurnDocument,
+  kind: ToolingErrorKind,
+): ToolingLayer | undefined {
   const settings = findElements(document.root, "CutSetting")
     .filter((setting) => setting.attributes.type === "Tool")
+  if (settings.length === 0) return undefined
   if (settings.length !== 1) {
     throw toolingError(
       kind,

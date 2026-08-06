@@ -9,7 +9,7 @@ import {
   warpPoint,
 } from "../calibration/transform.js"
 import {
-  extractToolingLayer,
+  extractOptionalToolingLayer,
   matchToolingPaths,
   normalizeToolingPath,
 } from "../calibration/tooling.js"
@@ -185,18 +185,23 @@ export function applyTransformToDocument(
     throw new TransformValidationError("--segment-length must be a positive finite number")
   }
   const document: LightBurnDocument = { ...input, root: cloneNode(input.root), warnings: [...input.warnings] }
-  const tooling = extractToolingLayer(document, "transform")
-  if (tooling.cutIndex !== transform.tooling.cutIndex) {
+  const tooling = extractOptionalToolingLayer(document, "transform")
+  if (tooling && tooling.cutIndex !== transform.tooling.cutIndex) {
     throw new TransformValidationError(
       `Input Tool CutIndex ${tooling.cutIndex} does not match transform Tool CutIndex `
       + transform.tooling.cutIndex,
     )
   }
-  const normalizedTooling = tooling.paths.map((path) => (
-    normalizeToolingPath(path.worldPath, tooling.bounds)
-  ))
-  const toolingAssignments = matchToolingPaths(normalizedTooling, transform.tooling.paths)
-  const toolingShapeOrders = new Set(tooling.paths.map((path) => path.shape.documentOrder))
+  const sourceBounds = tooling?.bounds ?? transform.sourceBoundsMm
+  const toolingAssignments = tooling
+    ? matchToolingPaths(
+      tooling.paths.map((path) => normalizeToolingPath(path.worldPath, tooling.bounds)),
+      transform.tooling.paths,
+    )
+    : undefined
+  const toolingShapeOrders = new Set(
+    tooling?.paths.map((path) => path.shape.documentOrder) ?? [],
+  )
   const shapes = collectShapeRecords(document.root)
   const resolver = new GeometryResolver(shapes)
   const warnings = [...document.warnings]
@@ -233,7 +238,7 @@ export function applyTransformToDocument(
     const correctedContours = geometry.contours.map((contour) => ({
       closed: contour.closed,
       points: contour.points.map((point) => {
-        const warped = warpPoint(point, transform, tooling.bounds)
+        const warped = warpPoint(point, transform, sourceBounds)
         if (warped.outside) outsidePointCount++
         return warped.point
       }),
@@ -241,16 +246,18 @@ export function applyTransformToDocument(
     materializePath(document, geometry.shape, correctedContours)
     correctedShapeCount++
   }
-  tooling.paths.forEach((path, index) => {
-    const template = transform.tooling.paths[toolingAssignments[index]!]!
-    writeResolvedPath(
-      document,
-      path.shape,
-      template.targetWorld,
-      invertMatrix(path.shape.parentTransform),
-    )
-    correctedShapeCount++
-  })
+  if (tooling && toolingAssignments) {
+    tooling.paths.forEach((path, index) => {
+      const template = transform.tooling.paths[toolingAssignments[index]!]!
+      writeResolvedPath(
+        document,
+        path.shape,
+        template.targetWorld,
+        invertMatrix(path.shape.parentTransform),
+      )
+      correctedShapeCount++
+    })
+  }
   removeThumbnails(document.root)
   document.warnings = warnings
   return {

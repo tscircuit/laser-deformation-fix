@@ -295,16 +295,33 @@ describe("global application", () => {
     ).toBe(true);
   });
 
-  test("rejects missing, ambiguous, incomplete, and mismatched tooling", () => {
+  test("applies using the saved calibration bounds when tooling is absent", () => {
+    const input = parseLightBurn(
+      `<?xml version="1.0" encoding="UTF-8"?>`
+      + `<LightBurnProject FormatVersion="1" MirrorX="False" MirrorY="False">`
+      + `<CutSetting type="Cut"><index Value="6"/><name Value="C00"/></CutSetting>`
+      + `<Shape Type="Path" CutIndex="6"><VertList>V1 2V3 4</VertList><PrimList>LineOpen</PrimList></Shape>`
+      + `</LightBurnProject>`,
+      "no-tool.lbrn2",
+    );
+    const result = applyTransformToDocument(input, testTransform(), {
+      segmentLength: 20,
+    });
+    const shapes = collectShapeRecords(result.document.root);
+    expect(result.correctedShapeCount).toBe(1);
+    expect(shapes).toHaveLength(1);
+    expect(new GeometryResolver(shapes).resolve(shapes[0]!).vertices).toEqual([
+      { x: 1, y: 2 },
+      { x: 3, y: 4 },
+    ]);
+  });
+
+  test("rejects ambiguous, incomplete, and mismatched tooling", () => {
     const valid = project(
       '<Shape Type="Path" CutIndex="6"><VertList>V1 1V2 2</VertList><PrimList>LineOpen</PrimList></Shape>',
     );
     const setting = '<CutSetting type="Tool"><index Value="30"/><name Value="T1"/></CutSetting>';
     const lastToolPath = '<Shape Type="Path" CutIndex="30"><VertList>V0 10V0 9.9</VertList><PrimList>LineOpen</PrimList></Shape>';
-    expect(() => applyTransformToDocument(
-      parseLightBurn(valid.replace(setting, ""), "missing-tool.lbrn2"),
-      testTransform(),
-    )).toThrow("Expected exactly one Tool CutSetting");
     expect(() => applyTransformToDocument(
       parseLightBurn(valid.replace(setting, setting + setting), "ambiguous-tool.lbrn2"),
       testTransform(),

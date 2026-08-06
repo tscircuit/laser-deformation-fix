@@ -23,35 +23,15 @@ export interface LearnResult {
   warnings: string[]
 }
 
-async function writeTransform(
-  outputPath: string,
-  transform: GlobalWarpTransform,
-): Promise<void> {
-  try {
-    await writeFile(outputPath, stringifyGlobalWarpTransform(transform), {
-      encoding: "utf8",
-      flag: "wx",
-    })
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "EEXIST") {
-      throw new OutputConflictError(`Transformation output already exists: ${outputPath}`)
-    }
-    throw error
-  }
-}
-
-export async function learnCommand(
-  originalPath: string,
-  correctedPath: string,
-  outputPath: string,
+export function learnTransformFromXml(
+  originalXml: string,
+  originalName: string,
+  correctedXml: string,
+  correctedName: string,
   options: LearnOptions = {},
-): Promise<LearnResult> {
-  const [originalXml, correctedXml] = await Promise.all([
-    readFile(originalPath, "utf8"),
-    readFile(correctedPath, "utf8"),
-  ])
-  const original = parseLightBurn(originalXml, originalPath)
-  const corrected = parseLightBurn(correctedXml, correctedPath)
+): LearnResult {
+  const original = parseLightBurn(originalXml, originalName)
+  const corrected = parseLightBurn(correctedXml, correctedName)
   const sourceTooling = extractToolingLayer(original, "calibration")
   const targetTooling = extractToolingLayer(corrected, "calibration")
   if (sourceTooling.cutIndex !== targetTooling.cutIndex) {
@@ -80,10 +60,7 @@ export async function learnCommand(
     format: "lightburn-global-warp-v2",
     sourceBoundsMm: sourceTooling.bounds,
     coordinateFrame: { mirrorX: original.mirrorX, mirrorY: original.mirrorY },
-    tooling: {
-      cutIndex: sourceTooling.cutIndex,
-      paths: toolingPaths,
-    },
+    tooling: { cutIndex: sourceTooling.cutIndex, paths: toolingPaths },
     xCoefficients: fit.xCoefficients,
     yCoefficients: fit.yCoefficients,
     fit: {
@@ -107,7 +84,6 @@ export async function learnCommand(
     corrected,
     { tolerance: options.tolerance ?? 0.01 },
   )
-  await writeTransform(outputPath, transform)
   const warnings = [...result.warnings]
   if (result.excludedPathCount > 0) {
     warnings.push(
@@ -115,9 +91,44 @@ export async function learnCommand(
       + "from direct fitting; excluded paths remained in contour verification",
     )
   }
-  return {
-    transform,
-    matchedShapeCount: result.matchedShapeCount,
-    warnings,
+  return { transform, matchedShapeCount: result.matchedShapeCount, warnings }
+}
+
+async function writeTransform(
+  outputPath: string,
+  transform: GlobalWarpTransform,
+): Promise<void> {
+  try {
+    await writeFile(outputPath, stringifyGlobalWarpTransform(transform), {
+      encoding: "utf8",
+      flag: "wx",
+    })
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "EEXIST") {
+      throw new OutputConflictError(`Transformation output already exists: ${outputPath}`)
+    }
+    throw error
   }
+}
+
+export async function learnCommand(
+  originalPath: string,
+  correctedPath: string,
+  outputPath: string,
+  options: LearnOptions = {},
+): Promise<LearnResult> {
+  const [originalXml, correctedXml] = await Promise.all([
+    readFile(originalPath, "utf8"),
+    readFile(correctedPath, "utf8"),
+  ])
+  const result = learnTransformFromXml(
+    originalXml,
+    originalPath,
+    correctedXml,
+    correctedPath,
+    options,
+  )
+  const { transform } = result
+  await writeTransform(outputPath, transform)
+  return result
 }

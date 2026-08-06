@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Generate and apply tooling-anchored LightBurn transformation matrices."
+    >
+    <title>LightBurn Alignment Utility</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="brand-row">
+          <span class="local-badge">Local processing</span>
+        </div>
+        <div class="hero-copy">
+          <p class="eyebrow">LightBurn alignment utility</p>
+          <h1>Calibrate once.<br>Apply anywhere.</h1>
+          <p class="lede">
+            Build a tooling-anchored transformation matrix from a known pair,
+            then apply it to any compatible LightBurn project.
+          </p>
+        </div>
+      </header>
+
+      <main class="workflow" aria-label="Transformation workflow">
+        <section class="step-card" aria-labelledby="learn-title">
+          <div class="step-heading">
+            <span class="step-number">01</span>
+            <div>
+              <p class="step-kicker">Calibration</p>
+              <h2 id="learn-title">Generate matrix</h2>
+            </div>
+          </div>
+
+          <form id="learn-form">
+            <label class="file-field">
+              <span class="file-label">Original project</span>
+              <span class="file-help">Uncorrected calibration geometry</span>
+              <input
+                id="original-file"
+                name="original"
+                type="file"
+                accept=".lbrn,.lbrn2"
+                required
+              >
+              <span class="file-choice" data-file-name="original-file">Choose LightBurn file</span>
+            </label>
+
+            <label class="file-field">
+              <span class="file-label">Corrected project</span>
+              <span class="file-help">Aligned version of the same project</span>
+              <input
+                id="corrected-file"
+                name="corrected"
+                type="file"
+                accept=".lbrn,.lbrn2"
+                required
+              >
+              <span class="file-choice" data-file-name="corrected-file">Choose LightBurn file</span>
+            </label>
+
+            <button class="primary-button" id="learn-button" type="submit">
+              <span>Generate transformation</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+
+          <div class="result-panel" id="learn-result" hidden>
+            <div class="result-title-row">
+              <div>
+                <p class="result-label">Matrix ready</p>
+                <p class="result-value" id="matrix-summary"></p>
+              </div>
+              <span class="success-dot" aria-hidden="true"></span>
+            </div>
+            <dl class="metrics" id="matrix-metrics"></dl>
+            <a class="download-link" id="matrix-download" download>
+              Download transform JSON
+            </a>
+          </div>
+
+          <p class="status" id="learn-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="step-card" aria-labelledby="apply-title">
+          <div class="step-heading">
+            <span class="step-number">02</span>
+            <div>
+              <p class="step-kicker">Production</p>
+              <h2 id="apply-title">Transform a project</h2>
+            </div>
+          </div>
+
+          <form id="apply-form">
+            <label class="file-field">
+              <span class="file-label">LightBurn project</span>
+              <span class="file-help">The circuit or artwork to correct</span>
+              <input
+                id="input-file"
+                name="input"
+                type="file"
+                accept=".lbrn,.lbrn2"
+                required
+              >
+              <span class="file-choice" data-file-name="input-file">Choose LightBurn file</span>
+            </label>
+
+            <label class="file-field optional-field">
+              <span class="file-label">Transformation JSON <em>optional</em></span>
+              <span class="file-help">Leave empty to use the matrix generated above</span>
+              <input
+                id="transform-file"
+                name="transform"
+                type="file"
+                accept=".json,application/json"
+              >
+              <span class="file-choice" data-file-name="transform-file">Choose existing matrix</span>
+            </label>
+
+            <div class="matrix-source" id="matrix-source">
+              No generated matrix is loaded yet.
+            </div>
+
+            <button class="primary-button accent-button" id="apply-button" type="submit">
+              <span>Apply transformation</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+
+          <div class="result-panel" id="apply-result" hidden>
+            <div class="result-title-row">
+              <div>
+                <p class="result-label">Project ready</p>
+                <p class="result-value" id="output-summary"></p>
+              </div>
+              <span class="success-dot" aria-hidden="true"></span>
+            </div>
+            <a class="download-link" id="output-download" download>
+              Download transformed project
+            </a>
+          </div>
+
+          <p class="status" id="apply-status" role="status" aria-live="polite"></p>
+        </section>
+      </main>
+
+      <footer>
+        Files are processed on this machine and removed from temporary storage
+        after each operation.
+      </footer>
+    </div>
+  </body>
+</html>
