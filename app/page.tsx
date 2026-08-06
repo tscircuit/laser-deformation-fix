@@ -139,7 +139,7 @@ export default function Home() {
       form.set("transformSource", transformSource)
       if (transform) form.set("transform", transform)
       form.set("input", input)
-      const response = await fetch("/api/apply", { method: "POST", body: form })
+      const response = await fetch("/api/apply?matrix-source=v2", { method: "POST", body: form })
       if (!response.ok) throw new Error(await responseError(response))
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)

@@ -58,6 +58,9 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     const known = error instanceof LightBurnLensWarpError
-    return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: known ? 400 : 500 })
+    return Response.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: known ? 400 : 500, headers: { "Cache-Control": "no-store" } },
+    )
   }
 }
