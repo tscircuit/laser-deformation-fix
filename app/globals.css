@@ -12,6 +12,67 @@
   max-width: 760px;
 }
 
+.matrix-options {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.matrix-options legend {
+  margin-bottom: 8px;
+  color: #83919a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.matrix-option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.matrix-option:hover,
+.matrix-option:focus-within,
+.matrix-option.selected {
+  border-color: #54746f;
+  background: #1b292e;
+}
+
+.matrix-option input {
+  margin: 3px 0 0;
+  accent-color: var(--cyan);
+}
+
+.matrix-option span {
+  display: grid;
+  gap: 4px;
+}
+
+.matrix-option strong {
+  font-size: 0.84rem;
+}
+
+.matrix-option small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.matrix-option.unavailable {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 @media (max-width: 720px) {
   .page-shell {
     width: min(100% - 24px, 1180px);

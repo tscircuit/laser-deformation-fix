@@ -15,6 +15,8 @@ interface LearnResponse {
   warnings: string[]
 }
 
+type TransformSource = "default" | "generated" | "uploaded"
+
 async function responseError(response: Response): Promise<string> {
   try {
     const body = await response.json() as { error?: string }
@@ -68,6 +70,7 @@ export default function Home() {
   const [input, setInput] = useState<File>()
   const [selectedTransform, setSelectedTransform] = useState<File>()
   const [generatedTransform, setGeneratedTransform] = useState<File>()
+  const [transformSource, setTransformSource] = useState<TransformSource>("default")
   const [learnData, setLearnData] = useState<LearnResponse>()
   const [learnStatus, setLearnStatus] = useState("")
   const [applyStatus, setApplyStatus] = useState("")
@@ -102,6 +105,7 @@ export default function Home() {
       if (matrixUrl) URL.revokeObjectURL(matrixUrl)
       const url = URL.createObjectURL(transform)
       setGeneratedTransform(transform)
+      setTransformSource("generated")
       setMatrixUrl(url)
       setLearnData(data)
       setLearnStatus(data.warnings.length
@@ -117,9 +121,14 @@ export default function Home() {
 
   async function apply(event: FormEvent) {
     event.preventDefault()
-    const transform = selectedTransform ?? generatedTransform
-    if (!transform || !input) {
-      setApplyStatus("Generate a matrix above or choose an existing transform JSON.")
+    if (!input) return
+    const transform = transformSource === "uploaded"
+      ? selectedTransform
+      : transformSource === "generated" ? generatedTransform : undefined
+    if (transformSource !== "default" && !transform) {
+      setApplyStatus(transformSource === "generated"
+        ? "Generate a matrix above before selecting the generated matrix."
+        : "Choose a transformation JSON before selecting the uploaded matrix.")
       return
     }
     setApplying(true)
@@ -127,7 +136,8 @@ export default function Home() {
     setOutput(undefined)
     try {
       const form = new FormData()
-      form.set("transform", transform)
+      form.set("transformSource", transformSource)
+      if (transform) form.set("transform", transform)
       form.set("input", input)
       const response = await fetch("/api/apply", { method: "POST", body: form })
       if (!response.ok) throw new Error(await responseError(response))
@@ -150,7 +160,7 @@ export default function Home() {
   return (
     <div className="page-shell">
       <header className="hero">
-        <div className="brand-row"><span className="hosted-badge">Private workspace app</span></div>
+        <div className="brand-row"><span className="hosted-badge">Public web app</span></div>
         <div className="hero-copy">
           <div>
             <p className="eyebrow">LightBurn alignment utility</p>
@@ -197,10 +207,27 @@ export default function Home() {
           </div>
           <form onSubmit={apply}>
             <FileField id="input-file" label="LightBurn project" help="The circuit or artwork to correct" accept=".lbrn,.lbrn2" onChange={setInput} />
-            <FileField id="transform-file" label="Transformation JSON" help="Leave empty to use the matrix generated above" accept=".json,application/json" optional onChange={setSelectedTransform} />
-            <div className={`matrix-source${generatedTransform ? " ready" : ""}`}>
-              {generatedTransform ? `Using generated ${generatedTransform.name}` : "No generated matrix is loaded yet."}
-            </div>
+            <fieldset className="matrix-options">
+              <legend>Transformation matrix</legend>
+              <label className={`matrix-option${transformSource === "default" ? " selected" : ""}`}>
+                <input type="radio" name="transform-source" value="default" checked={transformSource === "default"} onChange={() => setTransformSource("default")} />
+                <span><strong>Default transformation matrix</strong><small>alignment_test_circuit.lbrn2 → alignment_test_circuit_corrected.lbrn2</small></span>
+              </label>
+              <label className={`matrix-option${transformSource === "generated" ? " selected" : ""}${generatedTransform ? "" : " unavailable"}`}>
+                <input type="radio" name="transform-source" value="generated" checked={transformSource === "generated"} disabled={!generatedTransform} onChange={() => setTransformSource("generated")} />
+                <span><strong>Matrix generated above</strong><small>{generatedTransform ? generatedTransform.name : "Generate a matrix in step 01 first"}</small></span>
+              </label>
+              <label className={`matrix-option${transformSource === "uploaded" ? " selected" : ""}`}>
+                <input type="radio" name="transform-source" value="uploaded" checked={transformSource === "uploaded"} onChange={() => setTransformSource("uploaded")} />
+                <span><strong>Upload transformation JSON</strong><small>Use another saved v2 transformation</small></span>
+              </label>
+            </fieldset>
+            {transformSource === "uploaded" && (
+              <FileField id="transform-file" label="Transformation JSON" help="Choose a saved transformation matrix" accept=".json,application/json" onChange={(file) => {
+                setSelectedTransform(file)
+                if (file) setTransformSource("uploaded")
+              }} />
+            )}
             <button className="primary-button accent-button" type="submit" disabled={applying}>
               <span>{applying ? "Transforming project…" : "Apply transformation"}</span><span aria-hidden="true">→</span>
             </button>

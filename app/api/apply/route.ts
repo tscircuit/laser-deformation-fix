@@ -3,6 +3,7 @@ import { parseGlobalWarpTransform } from "@/src/calibration/transform"
 import { LightBurnLensWarpError, TransformValidationError } from "@/src/errors"
 import { parseLightBurn } from "@/src/xml/parse-lightburn"
 import { serializeLightBurn } from "@/src/xml/serialize-lightburn"
+import defaultTransform from "@/generated/alignment_transform.json"
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
@@ -22,15 +23,22 @@ function outputName(inputName: string): string {
 export async function POST(request: Request) {
   try {
     const form = await request.formData()
-    const transformFile = uploadedFile(form, "transform")
     const inputFile = uploadedFile(form, "input")
-    if (!/\.json$/i.test(transformFile.name)) throw new TransformValidationError("Transformation must use .json")
     if (!/\.lbrn2?$/i.test(inputFile.name)) throw new TransformValidationError("Input project must use .lbrn or .lbrn2")
     let rawTransform: unknown
-    try {
-      rawTransform = JSON.parse(await transformFile.text()) as unknown
-    } catch (error) {
-      throw new TransformValidationError(`Invalid transformation JSON: ${error instanceof Error ? error.message : String(error)}`)
+    const transformSource = form.get("transformSource")
+    if (transformSource === "default") {
+      rawTransform = defaultTransform
+    } else if (transformSource === "generated" || transformSource === "uploaded" || transformSource === null) {
+      const transformFile = uploadedFile(form, "transform")
+      if (!/\.json$/i.test(transformFile.name)) throw new TransformValidationError("Transformation must use .json")
+      try {
+        rawTransform = JSON.parse(await transformFile.text()) as unknown
+      } catch (error) {
+        throw new TransformValidationError(`Invalid transformation JSON: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    } else {
+      throw new TransformValidationError("Unknown transformation matrix source")
     }
     const transform = parseGlobalWarpTransform(rawTransform)
     const document = parseLightBurn(await inputFile.text(), inputFile.name)
