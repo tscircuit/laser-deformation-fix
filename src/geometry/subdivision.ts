@@ -8,9 +8,13 @@ function midpoint(a: Point, b: Point): Point {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 }
 
-function pointLineDistance(point: Point, start: Point, end: Point): number {
+function pointSegmentDistance(point: Point, start: Point, end: Point): number {
   const length = distance(start, end)
   if (length < 1e-15) return distance(point, start)
+  const projection = ((point.x - start.x) * (end.x - start.x)
+    + (point.y - start.y) * (end.y - start.y)) / (length * length)
+  if (projection <= 0) return distance(point, start)
+  if (projection >= 1) return distance(point, end)
   return Math.abs(
     (end.y - start.y) * point.x - (end.x - start.x) * point.y
       + end.x * start.y - end.y * start.x,
@@ -40,7 +44,7 @@ export function flattenCubicBezier(
   }
   const points: Point[] = [{ ...start }]
   const recurse = (p0: Point, p1: Point, p2: Point, p3: Point, depth: number): void => {
-    const flatness = Math.max(pointLineDistance(p1, p0, p3), pointLineDistance(p2, p0, p3))
+    const flatness = Math.max(pointSegmentDistance(p1, p0, p3), pointSegmentDistance(p2, p0, p3))
     if ((flatness <= options.flatnessTolerance && distance(p0, p3) <= options.maxSegmentLength) || depth >= 24) {
       points.push({ ...p3 })
       return
